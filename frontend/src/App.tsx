@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import './App.css'
+import ProductProposalForm from './ProductProposalForm'
 
 
 type Product = {
@@ -27,7 +28,7 @@ function App() {
 
   useEffect(() => {
     fetch('/api/products')
-    
+
       .then((response) => {
         if (!response.ok) {
           throw new Error('Failed to retrieve products')
@@ -50,16 +51,17 @@ function App() {
   }, [])
 
 
-  
+
   return (
     <div className="app-container">
 
       <header className="site-header">
         <h1>MiniShop</h1>
-        <p>Your go-to online shopping destination.</p>
+        <p>MiniShop — Final Report Pipeline Demo</p>
       </header>
 
       <main className="main-content">
+        <ProductProposalForm />
         <section className="catalogue-panel">
           <h2>Product Catalogue</h2>
           <p className="catalogue-description">

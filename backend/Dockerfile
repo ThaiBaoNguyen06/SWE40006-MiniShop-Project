@@ -8,6 +8,7 @@ RUN npm ci
 
 COPY tsconfig.json ./
 COPY src ./src
+COPY catalogue ./catalogue
 
 RUN npm run build
 

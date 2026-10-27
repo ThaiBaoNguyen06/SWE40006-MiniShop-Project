@@ -1,0 +1,146 @@
+name: MiniShop CI
+on:
+  push:
+    branches: [main, 'feature/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: minishop-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+            testing/package-lock.json
+      - run: npm ci --prefix testing
+      - name: Prepare browser dependencies
+        run: npm exec --prefix testing -- playwright install --with-deps chromium
+      - name: Test, build, package and verify the real test stack
+        run: node scripts/pipeline.mjs "$GITHUB_SHA" --verify-only
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ github.sha }}
+          path: artifacts/${{ github.sha }}/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Save browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-evidence-${{ github.sha }}
+          path: |
+            testing/playwright-report/
+            testing/test-results/
+          retention-days: 7
+
+  stage_catalogue:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feature/catalogue-')
+    needs: verify
+    runs-on: [self-hosted, Windows, minishop-deploy]
+    timeout-minutes: 15
+    environment: staging
+    concurrency:
+      group: minishop-local-deployment
+      cancel-in-progress: false
+    env:
+      RELEASE: ${{ github.sha }}
+      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/minishop-browsers
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          clean: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Require persistent deployment state
+        shell: pwsh
+        run: |
+          if (-not $env:MINISHOP_STATE_DIR) { throw 'Configure MINISHOP_STATE_DIR on the trusted runner.' }
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-${{ github.sha }}
+          path: artifacts/${{ github.sha }}
+      - name: Load tested candidate
+        run: |
+          docker load -i "artifacts/$env:RELEASE/images.tar"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Deploy staging
+        run: node scripts/deploy.mjs staging $env:RELEASE
+      - run: npm ci --prefix testing
+      - run: npm exec --prefix testing -- playwright install chromium
+      - name: Browser verification on staging
+        env:
+          BASE_URL: http://127.0.0.1:8283
+          EXPECTED_RELEASE: ${{ github.sha }}
+        run: npm test --prefix testing
+
+  propose_production:
+    needs: stage_catalogue
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Open a production review only after staging passes
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.CATALOGUE_PR_TOKEN || github.token }}
+          script: |
+            const head = context.ref.replace('refs/heads/', '');
+            const ref = await github.rest.git.getRef({ ...context.repo, ref: 'heads/' + head });
+            if (ref.data.object.sha !== context.sha) throw new Error('Branch advanced; wait for its latest staging check.');
+            const existing = await github.rest.pulls.list({ ...context.repo, head: context.repo.owner + ':' + head, base: 'main', state: 'open' });
+            if (existing.data.length) { core.notice(existing.data[0].html_url); return; }
+            const pr = await github.rest.pulls.create({
+              ...context.repo, head, base: 'main',
+              title: 'catalogue: promote staged product change',
+              body: 'Automated tests and staging verification passed for commit ' + context.sha + '.\n\nWorkflow: https://github.com/' + context.repo.owner + '/' + context.repo.repo + '/actions/runs/' + context.runId + '\n\nReview the catalogue change before merging. Production deployment runs after merge; this job does not merge automatically.'
+            });
+            core.notice(pr.data.html_url);
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: [self-hosted, Windows, minishop-deploy]
+    timeout-minutes: 15
+    environment: production
+    concurrency:
+      group: minishop-local-deployment
+      cancel-in-progress: false
+    env:
+      RELEASE: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          clean: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Require persistent deployment state
+        shell: pwsh
+        run: |
+          if (-not $env:MINISHOP_STATE_DIR) { throw 'Configure MINISHOP_STATE_DIR on the trusted runner.' }
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-${{ github.sha }}
+          path: artifacts/${{ github.sha }}
+      - name: Load tested release
+        run: |
+          docker load -i "artifacts/$env:RELEASE/images.tar"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Reverify merged release in staging
+        run: node scripts/deploy.mjs staging $env:RELEASE
+      - name: Deploy and verify production
+        run: node scripts/deploy.mjs production $env:RELEASE
