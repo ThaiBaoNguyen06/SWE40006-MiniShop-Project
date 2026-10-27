@@ -56,7 +56,6 @@ jobs:
       cancel-in-progress: false
     env:
       RELEASE: ${{ github.sha }}
-      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/minishop-browsers
     steps:
       - uses: actions/checkout@v4
         with:
@@ -78,6 +77,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Deploy staging
         run: node scripts/deploy.mjs staging $env:RELEASE
+      - name: Configure browser cache
+        shell: pwsh
+        run: Add-Content -LiteralPath $env:GITHUB_ENV -Value ("PLAYWRIGHT_BROWSERS_PATH=" + (Join-Path $env:RUNNER_TEMP "minishop-browsers"))
       - run: npm ci --prefix testing
       - run: npm exec --prefix testing -- playwright install chromium
       - name: Browser verification on staging
