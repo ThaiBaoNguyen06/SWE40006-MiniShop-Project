@@ -5,10 +5,17 @@ import { validateProduct, ProductValidationError, appendProduct, readCatalogue }
 import { automationMode, createProposal, readProposal, writeProposal, refreshGitHubProposal, AutomationUnavailableError } from './automation';
 
 export const proposalRouter = Router();
-function enabled(): boolean { return process.env.AUTOMATION_ENABLED === 'true' && process.env.APP_ENV === 'development'; }
-proposalRouter.get('/config', (_req, res) => res.json({ enabled: enabled(), mode: automationMode(), stagingUrl: 'http://localhost:8283', productionUrl: 'http://localhost:8284' }));
+function enabled(): boolean {
+ return process.env.AUTOMATION_ENABLED === 'true' && (process.env.APP_ENV === 'development' ||
+  (process.env.APP_ENV === 'production' && automationMode() === 'github' && process.env.ALLOW_PRODUCTION_PROPOSALS === 'true'));
+}
+proposalRouter.get('/config', (_req, res) => res.json({ enabled: enabled(), mode: automationMode(), automatic: process.env.GITHUB_DELIVERY_MODE === 'automatic', stagingUrl: process.env.STAGING_URL || 'http://localhost:8283', productionUrl: process.env.PRODUCTION_URL || 'http://localhost:8284' }));
 proposalRouter.use((req, res, next) => {
  if (!enabled()) { res.status(503).json({ message: 'Product proposals are disabled in this environment.' }); return; }
+ // Nginx is reachable only through the TLS proxy in the production admin setup.
+ if (process.env.APP_ENV === 'production' && req.get('x-forwarded-proto') !== 'https') {
+  res.status(426).json({ message: 'Open the HTTPS website before entering the admin access code.' }); return;
+ }
  let secret = process.env.ADMIN_TOKEN || '';
  try { if (process.env.ADMIN_TOKEN_FILE) secret = fs.readFileSync(process.env.ADMIN_TOKEN_FILE, 'utf8').trim(); } catch { secret = ''; }
  const supplied = req.get('authorization') || '';

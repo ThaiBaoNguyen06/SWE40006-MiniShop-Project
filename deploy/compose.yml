@@ -28,11 +28,17 @@ services:
       GITHUB_REPOSITORY: ${GITHUB_REPOSITORY:-}
       GITHUB_BASE_BRANCH: ${GITHUB_BASE_BRANCH:-main}
       GITHUB_AUTOMATION_TOKEN: ${GITHUB_AUTOMATION_TOKEN:-}
+      ALLOW_PRODUCTION_PROPOSALS: ${ALLOW_PRODUCTION_PROPOSALS:-false}
+      GITHUB_DELIVERY_MODE: ${GITHUB_DELIVERY_MODE:-review}
+      GITHUB_TOKEN_FILE_ENABLED: ${GITHUB_TOKEN_FILE_ENABLED:-false}
+      STAGING_URL: ${STAGING_URL:-http://localhost:8283}
+      PRODUCTION_URL: ${PRODUCTION_URL:-http://localhost:8284}
       APP_RELEASE: ${RELEASE}
       DATABASE_URL: postgres://minishop:${POSTGRES_PASSWORD}@database:5432/minishop
     volumes:
       - ${AUTOMATION_HOST_DIR}/queue:/automation
       - ${AUTOMATION_HOST_DIR}/admin-token:/run/secrets/minishop_admin:ro
+      - ${AUTOMATION_HOST_DIR}/github-token:/run/secrets/minishop_github:ro
     depends_on:
       database:
         condition: service_healthy

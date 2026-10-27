@@ -1,0 +1,109 @@
+name: AWS product delivery
+on:
+  push:
+    branches: ['feature/aws-product-*']
+permissions:
+  contents: read
+concurrency:
+  group: aws-catalogue-delivery
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Require a catalogue-only candidate based on the current published branch
+        run: |
+          git fetch origin catalogue-live
+          test "$(git rev-parse HEAD^)" = "$(git rev-parse origin/catalogue-live)"
+          test "$(git diff --name-only HEAD^ HEAD)" = 'backend/catalogue/products.json'
+          test "$(git rev-list --parents -n 1 HEAD | wc -w)" = '2'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci --prefix testing
+      - run: npm exec --prefix testing -- playwright install --with-deps chromium
+      - name: Unit, API, database and browser checks; package tested images
+        run: node scripts/pipeline.mjs "$GITHUB_SHA" --verify-only
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aws-release-${{ github.sha }}
+          path: artifacts/${{ github.sha }}/
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: aws-test-evidence-${{ github.sha }}
+          path: |
+            testing/playwright-report/
+            testing/test-results/
+
+  staging:
+    needs: verify
+    if: github.repository == 'ThaiBaoNguyen06/SWE40006-MiniShop-Project' && github.event_name == 'push'
+    runs-on: [self-hosted, Windows, minishop-aws-deploy]
+    environment: staging
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v4
+        with:
+          name: aws-release-${{ github.sha }}
+          path: artifacts/${{ github.sha }}
+      - name: Deploy the CI-tested images on AWS Staging
+        shell: pwsh
+        run: node scripts/deploy-aws.mjs staging $env:GITHUB_SHA
+      - run: npm ci --prefix testing
+      - run: npm exec --prefix testing -- playwright install chromium
+      - name: Acceptance checks against the public Staging application
+        env:
+          BASE_URL: http://13.218.245.164
+          EXPECTED_RELEASE: ${{ github.sha }}
+        run: npm test --prefix testing
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: aws-staging-evidence-${{ github.sha }}
+          path: |
+            testing/playwright-report/
+            testing/test-results/
+
+  production:
+    needs: staging
+    runs-on: [self-hosted, Windows, minishop-aws-deploy]
+    environment: production
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Reject a candidate if the published catalogue changed
+        shell: pwsh
+        run: |
+          git fetch origin catalogue-live
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((git rev-parse HEAD^) -ne (git rev-parse origin/catalogue-live)) { throw 'Catalogue changed. Submit again against the latest published catalogue.' }
+      - uses: actions/download-artifact@v4
+        with:
+          name: aws-release-${{ github.sha }}
+          path: artifacts/${{ github.sha }}
+      - name: Publish the same tested images and verify Production
+        shell: pwsh
+        run: node scripts/deploy-aws.mjs production $env:GITHUB_SHA
+      - name: Record the published catalogue without merging application code
+        shell: pwsh
+        run: |
+          git push origin "${env:GITHUB_SHA}:refs/heads/catalogue-live"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

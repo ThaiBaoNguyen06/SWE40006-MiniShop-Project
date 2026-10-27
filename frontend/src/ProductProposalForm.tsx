@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 
-type Config = { enabled: boolean; mode: 'local' | 'github'; stagingUrl: string; productionUrl: string }
+type Config = { enabled: boolean; mode: 'local' | 'github'; automatic?: boolean; stagingUrl: string; productionUrl: string }
 type Proposal = { id: string; status: string; mode: 'local' | 'github'; message?: string; url?: string; product: { name: string } }
 const labels: Record<string, string> = {
  queued: 'Queued for testing', running: 'Building and testing', staging_passed: 'Staging passed — awaiting your approval', approved: 'Approved — waiting for deployment', deploying: 'Deploying approved product', deployed: 'Product is live', failed: 'Automation failed — check the details', github_pending: 'GitHub workflow pending or running', pr_open: 'Pull request available — review the staging checks', merged: 'Merged — check production deployment', closed: 'Pull request closed',
@@ -52,8 +52,8 @@ export default function ProductProposalForm() {
   <button type="button" onClick={() => setOpen(!open)}>{open ? 'Close product editor' : 'Add a product'}</button>
   {open && <>
    <h2>Propose a new product</h2>
-   <p>The product is tested on Staging before approval for Production.</p>
-   <p className="automation-mode">{config.mode === 'local' ? 'Local demo mode — GitHub is not connected. Review and approval happen here.' : 'GitHub mode — a passing staging workflow opens a pull request for review.'}</p>
+   <p>{config.automatic ? 'Your product is checked on Staging and published automatically only after all checks pass.' : 'The product is tested on Staging before approval for Production.'}</p>
+   <p className="automation-mode">{config.mode === 'local' ? 'Local demo mode — GitHub is not connected. Review and approval happen here.' : config.automatic ? 'GitHub Actions checks the product and deploys it to Production.' : 'GitHub mode — a passing staging workflow opens a pull request for review.'}</p>
    <form onSubmit={submit} className="proposal-form">
     <label>Admin access code<input name="adminCode" type="password" autoComplete="off" value={token} onChange={e => setToken(e.target.value)} required /></label>
     <label>Product name<input name="productName" value={name} onChange={e => setName(e.target.value)} minLength={2} maxLength={100} required /></label>
@@ -66,6 +66,7 @@ export default function ProductProposalForm() {
    {proposal && <div className="proposal-status" aria-live="polite">
     <h3>{proposal.product.name}</h3>
     <p>{labels[proposal.status] || proposal.status}</p>
+    {proposal.status === 'deployed' && <button type="button" onClick={() => window.location.reload()}>Refresh catalogue</button>}
     {proposal.message && <p>{proposal.message}</p>}
     {proposal.url && <p><a href={proposal.url} target="_blank" rel="noreferrer">Open GitHub progress</a></p>}
     <p><a href={config.stagingUrl} target="_blank" rel="noreferrer">View Staging</a> · <a href={config.productionUrl} target="_blank" rel="noreferrer">View Production</a></p>

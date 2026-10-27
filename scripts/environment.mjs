@@ -18,11 +18,14 @@ export function environment(name, release) {
  fs.mkdirSync(path.join(automationRoot, 'queue'), { recursive: true });
  const adminFile = path.join(automationRoot, 'admin-token');
  if (!fs.existsSync(adminFile)) fs.writeFileSync(adminFile, randomBytes(24).toString('hex'), { mode: 0o600 });
+ const githubFile = path.join(automationRoot, 'github-token');
+ if (!fs.existsSync(githubFile)) fs.writeFileSync(githubFile, '', {mode: 0o600});
  const directory = path.join(state, name);
  fs.mkdirSync(directory, { recursive: true });
  const passwordFile = path.join(directory, 'password');
  if (!fs.existsSync(passwordFile)) fs.writeFileSync(passwordFile, randomBytes(24).toString('hex'), { mode: 0o600 });
- return { ...process.env, AUTOMATION_HOST_DIR: automationRoot, APP_ENV: name, AUTOMATION_ENABLED: name === 'development' ? 'true' : 'false', AUTOMATION_MODE: process.env.AUTOMATION_MODE || 'local', GITHUB_AUTOMATION_TOKEN: name === 'development' ? (process.env.GITHUB_AUTOMATION_TOKEN || '') : '', POSTGRES_PASSWORD: fs.readFileSync(passwordFile, 'utf8').trim(), RELEASE: release, HTTP_PORT: String(ports[name]) };
+ const cloudProposals = name === 'production' && process.env.AUTOMATION_MODE === 'github' && process.env.ALLOW_PRODUCTION_PROPOSALS === 'true';
+ return { ...process.env, AUTOMATION_HOST_DIR: automationRoot, APP_ENV: name, AUTOMATION_ENABLED: name === 'development' || cloudProposals ? 'true' : 'false', AUTOMATION_MODE: process.env.AUTOMATION_MODE || 'local', GITHUB_AUTOMATION_TOKEN: name === 'development' ? (process.env.GITHUB_AUTOMATION_TOKEN || '') : '', GITHUB_TOKEN_FILE_ENABLED: cloudProposals ? 'true' : 'false', POSTGRES_PASSWORD: fs.readFileSync(passwordFile, 'utf8').trim(), RELEASE: release, HTTP_PORT: String(ports[name]) };
 }
 export function projectName(name, release) {
  const suffix = name === 'testing' ? '-' + createHash('sha256').update(release).digest('hex').slice(0, 10) : '';

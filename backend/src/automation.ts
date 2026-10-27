@@ -21,7 +21,7 @@ export function automationMode(): 'local' | 'github' { return process.env.AUTOMA
 
 function githubConfig() {
  const repository = process.env.GITHUB_REPOSITORY || '';
- const token = process.env.GITHUB_AUTOMATION_TOKEN || '';
+ const token = process.env.GITHUB_TOKEN_FILE_ENABLED === 'true' ? fs.readFileSync('/run/secrets/minishop_github', 'utf8').trim() : (process.env.GITHUB_AUTOMATION_TOKEN || '');
  const base = process.env.GITHUB_BASE_BRANCH || 'main';
  if (!/^[\w.-]+\/[\w.-]+$/.test(repository) || !token || !/^[\w./-]+$/.test(base)) throw new AutomationUnavailableError('GitHub automation is not configured on the server.');
  return { repository, token, base };
@@ -44,7 +44,7 @@ export async function createProposal(product: CatalogueProduct): Promise<Proposa
   const file = await githubRequest('/contents/backend/catalogue/products.json?ref=' + encodeURIComponent(head.object.sha));
   const catalogue = validateCatalogue(JSON.parse(Buffer.from(file.content, 'base64').toString('utf8')));
   const next = appendProduct(catalogue, product);
-  proposal.branch = 'feature/catalogue-' + proposal.id;
+  proposal.branch = (process.env.GITHUB_DELIVERY_MODE === 'automatic' ? 'feature/aws-product-' : 'feature/catalogue-') + proposal.id;
   await githubRequest('/git/refs', 'POST', { ref: 'refs/heads/' + proposal.branch, sha: head.object.sha });
   const result = await githubRequest('/contents/backend/catalogue/products.json', 'PUT', {
    branch: proposal.branch, sha: file.sha, message: 'catalogue: propose ' + product.name,
@@ -59,6 +59,16 @@ export async function createProposal(product: CatalogueProduct): Promise<Proposa
 }
 export async function refreshGitHubProposal(proposal: Proposal): Promise<Proposal> {
  const { repository, base } = githubConfig();
+ if (process.env.GITHUB_DELIVERY_MODE === 'automatic') {
+  const runs = await githubRequest('/actions/workflows/aws-catalogue.yml/runs?head_sha=' + encodeURIComponent(proposal.commit || '') + '&per_page=10');
+  const run = runs.workflow_runs?.find((value: any) => value.head_sha === proposal.commit && value.event === 'push');
+  if (run) {
+   proposal.url = run.html_url;
+   proposal.status = run.status !== 'completed' ? 'running' : run.conclusion === 'success' ? 'deployed' : 'failed';
+   proposal.message = proposal.status === 'deployed' ? 'Staging tests passed and Production deployment was verified. Refresh the catalogue to see the product.' : proposal.status === 'failed' ? 'The delivery workflow did not complete. Check GitHub for the failed step; publication is not confirmed.' : 'GitHub Actions is verifying and delivering this product.';
+  }
+  writeProposal(proposal); return proposal;
+ }
  const pulls = await githubRequest('/pulls?state=all&head=' + encodeURIComponent(repository.split('/')[0] + ':' + proposal.branch) + '&base=' + encodeURIComponent(base));
  if (pulls.length) {
   const pr = pulls[0];

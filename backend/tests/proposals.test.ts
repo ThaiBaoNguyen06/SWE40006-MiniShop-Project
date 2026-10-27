@@ -21,6 +21,17 @@ describe('protected product proposal API', () => {
   expect(mocks.create).not.toHaveBeenCalled();
  });
  it('rejects missing authentication', async () => { await request(app).post('/api/product-proposals').send(product).expect(401); expect(mocks.create).not.toHaveBeenCalled(); });
+ it('requires HTTPS for explicitly enabled production proposals', async () => {
+  vi.stubEnv('APP_ENV','production'); vi.stubEnv('AUTOMATION_MODE','github'); vi.stubEnv('ALLOW_PRODUCTION_PROPOSALS','true');
+  await request(app).post('/api/product-proposals').set('Authorization',authorization).send(product).expect(426);
+  expect(mocks.create).not.toHaveBeenCalled();
+ });
+ it('accepts an authenticated production proposal through the configured HTTPS proxy', async () => {
+  vi.stubEnv('APP_ENV','production'); vi.stubEnv('AUTOMATION_MODE','github'); vi.stubEnv('ALLOW_PRODUCTION_PROPOSALS','true');
+  mocks.create.mockResolvedValue({id:'cloud-proposal',mode:'github',status:'github_pending',product});
+  await request(app).post('/api/product-proposals').set('X-Forwarded-Proto','https').set('Authorization',authorization).send(product).expect(202);
+  expect(mocks.query).not.toHaveBeenCalled();
+ });
  it('rejects an incorrect admin code', async () => { await request(app).post('/api/product-proposals').set('Authorization', 'Bearer incorrect').send(product).expect(401); });
  it('rejects invalid products before queueing them', async () => {
   await request(app).post('/api/product-proposals').set('Authorization', authorization).send({ ...product, price: '-1' }).expect(400); expect(mocks.create).not.toHaveBeenCalled();
