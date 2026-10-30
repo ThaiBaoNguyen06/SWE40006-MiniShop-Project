@@ -24,3 +24,8 @@ npm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+# Generated browser binaries, secrets, deployments and evidence
+.local/
+artifacts/
+testing/test-results/
+testing/playwright-report/

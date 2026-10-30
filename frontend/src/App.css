@@ -133,3 +133,12 @@
     font-size: 1.6rem;
   }
 }
+
+.proposal-panel { width: 100%; box-sizing: border-box; margin-bottom: 24px; padding: 24px; border-radius: 16px; background: #ffffff; color: #24314a; text-align: left; }
+.proposal-panel button { padding: 12px 18px; border: 0; border-radius: 8px; background: #5434a5; color: white; cursor: pointer; font: inherit; }
+.proposal-panel button:disabled { opacity: .6; cursor: wait; }
+.proposal-form { display: grid; gap: 14px; max-width: 600px; }
+.proposal-form label { display: grid; gap: 6px; font-weight: 600; }
+.proposal-form input, .proposal-form textarea { padding: 10px; border: 1px solid #aab4c5; border-radius: 6px; font: inherit; box-sizing: border-box; width: 100%; }
+.proposal-status { margin-top: 20px; padding: 18px; background: #edf6ff; border-radius: 10px; }
+.automation-mode { padding: 10px; background: #fff5d6; border-radius: 6px; }

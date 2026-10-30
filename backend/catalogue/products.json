@@ -1,0 +1,58 @@
+[
+  {
+    "key": "wireless-mouse",
+    "name": "Wireless Mouse",
+    "description": "Ergonomic wireless computer mouse.",
+    "price": "20.00",
+    "stock_quantity": 36
+  },
+  {
+    "key": "mechanical-keyboard",
+    "name": "Mechanical Keyboard",
+    "description": "Compact mechanical keyboard.",
+    "price": "90.00",
+    "stock_quantity": 19
+  },
+  {
+    "key": "usb-c-hub",
+    "name": "USB-C Hub",
+    "description": "Multi-port USB-C connectivity hub.",
+    "price": "50.00",
+    "stock_quantity": 28
+  },
+  {
+    "key": "laptop-stand",
+    "name": "Laptop Stand",
+    "description": "Adjustable aluminium laptop stand.",
+    "price": "40.00",
+    "stock_quantity": 15
+  },
+  {
+    "key": "bluetooth-headphones",
+    "name": "Bluetooth Headphones",
+    "description": "Wireless over-ear headphones.",
+    "price": "80.00",
+    "stock_quantity": 22
+  },
+  {
+    "key": "portable-ssd",
+    "name": "Portable SSD",
+    "description": "Compact external solid-state storage drive.",
+    "price": "60.00",
+    "stock_quantity": 44
+  },
+  {
+    "key": "webcam",
+    "name": "Webcam",
+    "description": "High-definition USB webcam for video calls.",
+    "price": "70.00",
+    "stock_quantity": 32
+  },
+  {
+    "key": "wireless-charger",
+    "name": "Wireless Charger",
+    "description": "Convenient wireless charging pad.",
+    "price": "30.00",
+    "stock_quantity": 48
+  }
+]
