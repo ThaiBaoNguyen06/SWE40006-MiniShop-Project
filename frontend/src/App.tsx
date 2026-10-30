@@ -57,7 +57,6 @@ function App() {
 
       <header className="site-header">
         <h1>MiniShop</h1>
-        <p>MiniShop — Final Report Pipeline Demo</p>
       </header>
 
       <main className="main-content">
