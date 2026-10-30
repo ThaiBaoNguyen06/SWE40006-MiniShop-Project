@@ -52,8 +52,6 @@ export default function ProductProposalForm() {
   <button type="button" onClick={() => setOpen(!open)}>{open ? 'Close product editor' : 'Add a product'}</button>
   {open && <>
    <h2>Propose a new product</h2>
-   <p>{config.automatic ? 'Your product is checked on Staging and published automatically only after all checks pass.' : 'The product is tested on Staging before approval for Production.'}</p>
-   <p className="automation-mode">{config.mode === 'local' ? 'Local demo mode — GitHub is not connected. Review and approval happen here.' : config.automatic ? 'GitHub Actions checks the product and deploys it to Production.' : 'GitHub mode — a passing staging workflow opens a pull request for review.'}</p>
    <form onSubmit={submit} className="proposal-form">
     <label>Admin access code<input name="adminCode" type="password" autoComplete="off" value={token} onChange={e => setToken(e.target.value)} required /></label>
     <label>Product name<input name="productName" value={name} onChange={e => setName(e.target.value)} minLength={2} maxLength={100} required /></label>
